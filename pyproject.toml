@@ -1,0 +1,30 @@
+[build-system]
+requires = ["setuptools>=61.0","setuptools-scm>=8","pytest"]
+build-backend = "setuptools.build_meta"
+[project]
+name = "pyaltim"
+dynamic = ["version"]
+authors = [
+  { name="Roelof Rietbroek", email="r.rietbroek@utwente.nl" },
+]
+description = "Tools to work with Satellite radar altimetry"
+readme = "README.md"
+requires-python = ">=3.8"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: Apache Software License",
+    "Operating System :: POSIX :: Linux",
+    "Intended Audience :: Science/Research",
+    "Topic :: Scientific/Engineering",
+    "Development Status :: 1 - Planning"
+]
+dependencies = [ "xarray >= 2023.1.0","importlib_metadata","requests"]
+
+[tool.setuptools_scm]
+# empty for now
+
+[project.urls]
+"Homepage" = "https://github.com/ITC-Water-Resources/pyaltim"
+"Bug Tracker" = "https://github.com/ITC-Water-Resources/pyaltim/issues"
+
+
