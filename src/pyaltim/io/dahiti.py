@@ -155,28 +155,30 @@ def download_DAHITI_stations(path, roi_path):
 
 
 
-def update_metadata_DAHITI(folder_path):
+def update_metadata_DAHITI(metadata_file_loc, raw_folder_dir):
 
-    """This function updates the existing Metadata file which was created while downloading all csv's. 
-    In this updatation it includes station_id, temporal range, min - max data records, lat - long of the stations.
+    """This function updates the existing Metadata file which was created while downloading all the csv's. In this updatation it includes station_id, temporal range, min - max data records, lat - long of the stations.
 
     Parameters
     ----------
-    folder_path : str
-                Takes the folder path where Dahiti_Raw and Dahiti_Processed folders are downloaded
+    metadata_file_loc : str
+                Takes the file path metadata csv which was created while downloading
+    raw_folder_dir : str
+                Takes the folder path where all the downloaded raw csv's are located            
 
     Returns
     -------
     Dataframe : Pandas Datafram of Metadata of the downloaded Virtual Stations
-                Updated Metadata Dataframe developed by extracting data from download csv's.
+                Develops an update Metadata Dataframe by extracting data from download csv's.
     """
 
 
-    path = folder_path + "/DAHITI_Raw/*.csv"
+
+    path = raw_folder_dir + "/*.csv"
     file_dir = glob.glob(path)
 
     if len(file_dir)==0:
-        raise TypeError("No files are found in this path: '{}'. Tha path should be formated in this way 'folder/DAHITI_Raw' where all the downloaded csv's are located.".format(folder_path))
+        raise TypeError("No files are found in this path: '{}'. Tha path should the folder directory where all the downloaded csv's are located.".format(raw_folder_dir))            
 
     else:    
         file_dir.sort()
@@ -214,20 +216,14 @@ def update_metadata_DAHITI(folder_path):
         MetaDataFrame_DAHITI["MaxHeight_Datetime"] = MetaDataFrame_DAHITI["datetime_y"]
         MetaDataFrame_DAHITI["MaxHeight_Error"] = MetaDataFrame_DAHITI["error_y"]
 
-        path = folder_path + "/DAHITI_Processed/00_DAHITI_metadata_v0.csv"
+        metadata_file_loc = metadata_file_loc
+        if not os.path.exists(metadata_file_loc):
+            raise FileNotFoundError(f"File '{metadata_file_loc}' not found.")
 
-        file_dir = glob.glob(path)
-        if len(file_dir)==0:
-            raise TypeError("No metadata files are found in this path: '{}'. Tha path should be formated in this way 'folder/DAHITI_Processed' where 00_DAHITI_metadata_v0 is created through the download_DAHITI_stations function.".format(folder_path))
         else:
-            file_dir.sort()
-            df4 = pd.read_csv(file_dir[0])
+            df4 = pd.read_csv(metadata_file_loc)
             df4["Dahiti_ID"] = df4["Dahiti_ID"].astype(str)
             MetaDataFrame_DAHITI = pd.merge(df4, MetaDataFrame_DAHITI, on='Dahiti_ID', how='left')
             MetaDataFrame_DAHITI.drop(["Unnamed: 0",'water_level_x', 'datetime_x', 'error_x', 'water_level_y','datetime_y', 'error_y'], axis=1, inplace=True)
-
-            out_fn = folder_path + "/DAHITI_Processed/01_DAHITI_metadata_v1_Updated.csv"
-            MetaDataFrame_DAHITI.to_csv(out_fn)
-
 
             return(MetaDataFrame_DAHITI)
