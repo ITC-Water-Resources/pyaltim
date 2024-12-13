@@ -26,14 +26,12 @@ class HydrowebBase(DataSet):
         super().__init__(dbconn)
 
     
-    def pull(self,geom=None):
+    def pull(self,geom=None,list=False):
         if self.product is None:
             raise RuntimeError("Derived type of Hydrowebbase needs the prdouct member to be set")
         # geom="POLYGON ((32.11853 -1.74793,34.75525 -1.74793,34.75525 -0.30212,32.11853 -0.30212,32.11853 -1.74793))" 
         
         # geom="POLYGON ((31.83165 -3.31937,46.74719 -3.31937,46.74719 4.60545,31.83165 4.60545,31.83165 -3.31937))"
-        if geom is None:
-            raise RuntimeError("geometry needs to be provided")
         #retrieve apikey and output directory to replace in the configuration
         
         cachedir=self.cacheDir()
@@ -42,6 +40,14 @@ class HydrowebBase(DataSet):
               
         dag = EODataAccessGateway()
         dag.update_providers_config(ymlconfig)
+        
+        if list:
+            dag.list_product_types()
+            return
+
+        if geom is None:
+            raise RuntimeError("geometry needs to be provided")
+        
         #Search the catalogue 
 
         search_results= dag.search_all(productType=self.product, geom=geom)
