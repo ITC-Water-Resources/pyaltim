@@ -1,83 +1,111 @@
 ## Entry point to store and manage hydroweb data in a geoslurp enabled database 
 
 from geoslurp.dataset import DataSet
-from geoslurp.config.slurplogger import slurplog
-from eodag import EODataAccessGateway, SearchResult
-from pyaltim.io.hydroweb_io import readHydroWeb_Lakes,readHydroWeb_Rivers
+from pyaltim.core.logging import altlogger 
+from pyaltim.portals.hydroweb import HydrowebConnect
+from geoslurp.dataset.pandasbase import PandasBase
 from glob import glob
 import os
 import numpy as np
 
-theiayaml="""
-hydroweb_next:
-    priority: 10
-    auth:
-        credentials:
-            apikey: APIKEYREPLACE
-    download:
-        outputs_prefix: OUTPUTPATHREPLACE
-"""
+from sqlalchemy import Column, Integer,String
+from sqlalchemy.dialects.postgresql import TIMESTAMP,JSONB
+from sqlalchemy.ext.declarative import declared_attr, as_declarative
+from sqlalchemy import MetaData
+from geoslurp.types.json import DataArrayJSONType
+schema="pyaltim"
+import geopandas as gpd 
+import xarray as xr
 
-class HydrowebBase(DataSet):
-    schema="pyaltim"
+class HydrowebBase(PandasBase):
+    schema=schema
     product=None
-    readfunc=None
+    ftype="GPKG" 
     def __init__(self,dbconn):
         super().__init__(dbconn)
+        self.pdfile=os.path.join(self.cacheDir(),"Hydroweb_holdings.gpkg")
 
-    
-    def pull(self,geom=None,list=False):
+    def pull(self,geom=None):
         if self.product is None:
             raise RuntimeError("Derived type of Hydrowebbase needs the prdouct member to be set")
-        # geom="POLYGON ((32.11853 -1.74793,34.75525 -1.74793,34.75525 -0.30212,32.11853 -0.30212,32.11853 -1.74793))" 
-        
-        # geom="POLYGON ((31.83165 -3.31937,46.74719 -3.31937,46.74719 4.60545,31.83165 4.60545,31.83165 -3.31937))"
-        #retrieve apikey and output directory to replace in the configuration
-        
-        cachedir=self.cacheDir()
         cred=self.conf.authCred("hydroweb_next",qryfields=["apikey"])
-        ymlconfig=theiayaml.replace('APIKEYREPLACE',cred.apikey).replace('OUTPUTPATHREPLACE',cachedir)
-              
-        dag = EODataAccessGateway()
-        dag.update_providers_config(ymlconfig)
-        
-        if list:
-            dag.list_product_types()
-            return
-
-        if geom is None:
-            raise RuntimeError("geometry needs to be provided")
-        
-        #Search the catalogue 
-
-        search_results= dag.search_all(productType=self.product, geom=geom)
-        
-        slurplog.info(f"Found {len(search_results)} {self.product} products, start download") 
-        dag.download_all(search_results)
+        hywconn=HydrowebConnect(collection_id=self.product,apikey=cred.apikey)
+        altlogger.info(f"Cataloging items for {self.product}" )
+        gdfhyweb=hywconn.get_items() 
+        gdfhyweb.to_file(self.pdfile,driver="GPKG")
     
-    def register(self):
-        # retrieve files in the cache directory
-        self.dropTable()
-        searchpath=self.cacheDir()+"/*/*.txt"
-        cachedfiles=[file for file in glob(searchpath)]
-        dfcomplete=None 
-        for file in cachedfiles:
-            slurplog.info(f"Adding {os.path.basename(file)} to {self.schema}.{self.name}") 
-            df=self.readfunc(file)
-            tname=self.name
-            df.to_postgis(name=tname,con=self.db.dbeng,if_exists="append",schema=self.schema,index_label="hydrowebid")
 
-        #also update entry in the inventory table
-        self.updateInvent()
+@as_declarative(metadata=MetaData(schema=schema))
+class HydrowebTBase(object):
+    @declared_attr
+    def __tablename__(cls):
+        #strip of the 'Table' from the class name
+        return cls.__name__[:-5].replace("-","_").lower()
+    id=Column(Integer,primary_key=True)
+    item_id=Column(String,index=True,unique=True)
+    lastupdate=Column(TIMESTAMP)
+    tstart=Column(TIMESTAMP,index=True)
+    tend=Column(TIMESTAMP,index=True)
+    data=Column(DataArrayJSONType)
+
+
+class HydrowebAssetBase(DataSet):
+    product=None
+    schema=schema
+    holdingcls=None
+    def __init__(self,dbconn):
+        if self.product is None:
+            raise RuntimeError("class product member needs to be described in derived class")
+        super().__init__(dbconn)
+        self.holdings=self.holdingcls(dbconn)
+
+    def pull(self):
+        altlogger.info("Updating Hydroweb holdings")
+        self.holdings.pull()
+        self.holdings.register()
+
+    def register(self,geom=None):
+        if self.db.tableExists(self.stname()):
+            # lastupdate=self.dahtargets._dbinvent.lastupdate.isoformat()
+            # only select stations which require updating (lastupdate < catalogue update)
+            qry=f"SELECT comb.item_id,comb.geometry FROM (SELECT targets.*, prod.lastupdate FROM {self.holdingcls.stname()} as targets LEFT JOIN {self.stname()} as prod ON targets.item_id = prod.item_id) AS comb WHERE comb.lastupdate IS NULL OR comb.lastupdate < comb.tend"
+        else:
+            qry=f"SELECT * from {self.holdingcls.stname()}"
+        dftargets=gpd.read_postgis(qry,self.db.dbeng,geom_col="geometry")
+        if geom is not None:
+            #select only a subset of the data to download
+            dftargets=dftargets[dftargets.within(geom)]        
+        
+        if len(dftargets) == 0:
+            altlogger.info("nothing to update/register")
+
+        cred=self.conf.authCred("hydroweb_next",qryfields=["apikey"])
+        hywconn=HydrowebConnect(collection_id=self.product,apikey=cred.apikey)
+        altlogger.info(f"retrieving assets for {self.product}" )
+        nfail=0
+        for ix,darow in dftargets.iterrows():
+            altlogger.info(f"getting {self.product} for {darow['item_id']}")
+            info,dsprod=hywconn.get_asset(darow['item_id'])
+            proddict={ky:val for ky,val in info.items() if ky in ["lastupdate","tstart","tend"]}
+            proddict["item_id"]=darow['item_id']
+            proddict['data']=dsprod
+            #create a dictionary to upsert in the table
+            
+            self.upsertEntry(proddict,index_elements=['item_id'])
+
+
 
 def getHydroWebDsets(conf):
     """Generate relevant Hydroweb datasets"""
-    products=["HYDROWEB_RIVERS","HYDROWEB_LAKES"]
-    readf={"HYDROWEB_LAKES":readHydroWeb_Lakes,"HYDROWEB_RIVERS":readHydroWeb_Rivers}
     clss=[] 
-    for product in products:
+    for product in HydrowebConnect.products:
         clsName=product.lower()
-        clss.append(type(clsName, (HydrowebBase,), {"product":product,"readfunc":staticmethod(readf[product])}))
+        clsshold=type(clsName, (HydrowebBase,), {"product":product})
+        clss.append(clsshold)
+        # also create an assets table
+        clsName2=product.lower()+"_assets"
+        qtable=type(clsName2 +"Table", (HydrowebTBase,), {})
+        clss.append(type(clsName2, (HydrowebAssetBase,), {"product":product,"holdingcls":clsshold,"table":qtable}))
 
     return clss
 
