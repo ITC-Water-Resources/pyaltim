@@ -32,4 +32,5 @@ dependencies = [ "xarray >= 2023.1.0","importlib_metadata","requests"]
 
 [project.entry-points."geoslurp.dsetfactories"]
 hydroweb = "pyaltim.geoslurp.hydroweb:getHydroWebDsets"
+dahitiweb = "pyaltim.geoslurp.dahiti:getDahitiDsets"
 
