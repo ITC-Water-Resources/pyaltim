@@ -18,7 +18,7 @@ classifiers = [
     "Topic :: Scientific/Engineering",
     "Development Status :: 1 - Planning"
 ]
-dependencies = [ "xarray >= 2023.1.0","importlib_metadata","requests"]
+dependencies = [ "xarray >= 2023.1.0","importlib_metadata","requests","pystac-client"]
 
 #[project.optional-dependencies]
 #geoslurp = ["geoslurp >= 3.0","eodag"]

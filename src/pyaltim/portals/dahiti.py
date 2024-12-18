@@ -13,12 +13,13 @@ import numpy as np
 import xarray as xr
 from datetime import datetime
 from pyaltim.portals.api import APILimitReached
+import getpass
 
 class DahitiConnect:
     rooturl="https://dahiti.dgfi.tum.de/api/v2/"
     def __init__(self,apikey=None):
         if apikey is None:
-            apikey=input("Please input your Dahiti v2 API v2 key")
+            apikey=getpass.getpass("Please input your Dahiti v2 API v2 key")
         self.argsbase=dict(api_key=apikey)
 
     def list_targets(self,geom=None):

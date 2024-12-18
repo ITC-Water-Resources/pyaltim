@@ -13,6 +13,7 @@ import shapely
 import requests
 import xarray as xr
 from pyaltim.portals.api import APILimitReached
+import getpass
 
 def decyear2dt(decyear):
     """Convert a decimal year to a datetime object"""
@@ -168,7 +169,7 @@ class HydrowebConnect:
     products=["HYDROWEB_RIVERS_RESEARCH","HYDROWEB_RIVERS_OPE","HYDROWEB_LAKES_RESEARCH","HYDROWEB_LAKES_OPE"]
     def __init__(self,collection_id,apikey=None):
         if apikey is None:
-            apikey=input("Please enter apikey for hydroweb next (theia)")
+            apikey=getpass.getpass("Please enter apikey for hydroweb next (theia)")
         if collection_id not in self.products:
             raise RuntimeError(f"Collection_id must be one of {self.products}")
         self.collection_id=collection_id
@@ -204,20 +205,29 @@ class HydrowebConnect:
         return self._collection
 
 
-    def get_items(self):
+    def get_items(self,geom=None):
         """Get a dataframe of the items in the collection"""
-        geom=[]
+        geoms=[]
         item_id=[]
         tstart=[]
         tend=[]
-        for item in self.collection.get_items():
-            geom.append(shapely.from_geojson(json.dumps(item.geometry)))
+        if geom is None:
+            searchitems=self.collection.get_items()
+        else:
+            # for some reason polygon query does not work so lets stick to bbox restriction
+            searchitems=self.client.search(collections=[self.collection_id],bbox=geom.bounds).items()
+
+            # searchitems=self.client.search(collections=self._collection,intersects=geom).items()
+        for item in searchitems:
+            geoms.append(shapely.from_geojson(json.dumps(item.geometry)))
             item_id.append(item.id)
             tstart.append(item.common_metadata.start_datetime)
             tend.append(item.common_metadata.end_datetime)
 
-        gdf=gpd.GeoDataFrame(dict(tstart=tstart,tend=tend,item_id=item_id),geometry=geom)
-        gdf.set_crs("EPSG:4326",inplace=True)
+        gdf=gpd.GeoDataFrame(dict(tstart=tstart,tend=tend,item_id=item_id),geometry=geoms,crs="EPSG:4326")
+        if geom is not None:
+            gdf=gdf[gdf.geometry.within(geom)]
+
         return gdf
 
     def get_asset(self,item_id):
