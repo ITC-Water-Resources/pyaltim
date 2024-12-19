@@ -66,7 +66,7 @@ def SwordClassFactory(clsName,val):
 
 def getSwordDsets(conf):
     # Function does not initiate class instances, but only defines class types
-    continents=["eu","af","sa","oc","as"]
+    continents=["eu","af","sa","oc","as","na"]
     swordtypes = ["reaches", "nodes"]
     out=[]
     
