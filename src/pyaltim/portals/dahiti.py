@@ -12,7 +12,7 @@ from shapely import Point
 import numpy as np
 import xarray as xr
 from datetime import datetime
-from pyaltim.portals.api import APILimitReached
+from pyaltim.portals.api import APILimitReached,APIDataNotFound,APIOtherError
 import getpass
 
 class DahitiConnect:
@@ -59,7 +59,7 @@ class DahitiConnect:
         args={"format":"json","dahiti_id":dah_id}
         waterlevel=self._handle_resp("download-water-level",args)
         if len(waterlevel['data']) == 0:
-            raise RuntimeError("No data found")
+            raise APIDataNotFound(f"No data found for {dah_id}")
         
         ds=xr.Dataset(dict(water_level=('time',[val['water_level'] for val in waterlevel['data']]),wl_err=('time',[val['error'] for val in waterlevel['data']])),coords=dict(time=('time',[val['datetime'] for val in waterlevel['data']])))
         return waterlevel['info'],ds
@@ -79,8 +79,10 @@ class DahitiConnect:
 
         #add api key for authentication
         args.update(self.argsbase)
-        
-        response=requests.get(url,json=args)
+        s = requests.Session()
+        retries = requests.adapters.Retry(total=3, backoff_factor=0.1, status_forcelist=[502, 503, 504], allowed_methods={'POST','GET'})
+        s.mount(url, requests.adapters.HTTPAdapter(max_retries=retries)) 
+        response=s.get(url,json=args)
 
         if response.status_code == 200:
             data = json.loads(response.text)
@@ -89,8 +91,7 @@ class DahitiConnect:
         elif response.status_code == 429:
             raise APILimitReached(f"Dahiti API rate limit reached {response.text}")
         else:
-
-            log.warning(response.text)
-            log.warning(response.status_code)
-    
+            breakpoint()
+            raise APIOtherError(f"Other API error {response.status_code},{response.text}")
+                
 

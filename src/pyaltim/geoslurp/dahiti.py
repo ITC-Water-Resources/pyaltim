@@ -2,7 +2,7 @@
 
 from geoslurp.dataset.pandasbase import PandasBase
 from geoslurp.dataset.dataSetBase import DataSet
-from geoslurp.config.slurplogger import slurplog
+from pyaltim.core.logging import altlogger
 from pyaltim.portals.dahiti import DahitiConnect
 from glob import glob
 import geopandas as gpd
@@ -14,7 +14,7 @@ from sqlalchemy.dialects.postgresql import TIMESTAMP,JSONB
 from sqlalchemy.ext.declarative import declared_attr, as_declarative
 from sqlalchemy import MetaData
 from geoslurp.types.json import DataArrayJSONType
-from pyaltim.portals.api import APILimitReached
+from pyaltim.portals.api import APILimitReached,APIDataNotFound
 
 schema="pyaltim"
 
@@ -32,7 +32,7 @@ class DahitiTargets(PandasBase):
         dahcon=DahitiConnect(cred.apikey)
         
         #retrieve the complete catalogue first
-        slurplog.info("Downloading current Dahiti holdings")
+        altlogger.info("Downloading current Dahiti holdings")
         gdfdahiti=dahcon.list_targets()
         #save to a cached GPKG file
         gdfdahiti.to_file(self.pdfile,driver="GPKG")
@@ -62,7 +62,7 @@ class DahitiBase(DataSet):
         
     def pull(self):
         #Update the Dahititargets table
-        slurplog.info("Updating dahiti holdings")
+        altlogger.info("Updating dahiti holdings")
         #dahtargets=DahitiTargets(self.db)
         self.dahtargets.pull()
         self.dahtargets.register()
@@ -78,25 +78,29 @@ class DahitiBase(DataSet):
         if geom is not None:
             #select only a subset of the data to download
             dftargets=dftargets[dftargets.within(geom)]        
-        
         #select only relevant products
         dftargets=dftargets[dftargets.data_access == f"{self.product}:public"]
         if len(dftargets) == 0:
-            slurplog.info("nothing to update/register")
-
+            altlogger.info("nothing to update/register")
+        ncount=0
         cred=self.conf.authCred("dahitiv2",qryfields=["apikey"])
         dahcon=DahitiConnect(cred.apikey)
         for ix,darow in dftargets.iterrows():
-            slurplog.info(f"getting {self.product} for {darow['dahiti_id']}")
-            target, dsprod=dahcon.get_by_product(darow['dahiti_id'],self.product)
+            altlogger.info(f"getting {self.product} for {darow['dahiti_id']}")
+            try:
+                target, dsprod=dahcon.get_by_product(darow['dahiti_id'],self.product)
+            except APIDataNotFound as exc:
+                altlogger.warning(f"No data found for {darow['dahiti_id']},continuing")
+                continue
+            except APILimitReached:
+                altlogger.warning(f"APILimitReached, stopping")
+                break
 
-                
             #create a dictionary to upsert in the table
             proddict=dict(dahiti_id=darow['dahiti_id'],tstart=dsprod.time.min().item(), tend=dsprod.time.max().item(),data=dsprod,lastupdate=datetime.now())
             
-            
             self.upsertEntry(proddict,index_elements=['dahiti_id'])
-
+            ncount+=1
 
 
 def getDahitiDsets(conf):

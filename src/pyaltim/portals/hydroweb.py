@@ -175,6 +175,7 @@ class HydrowebConnect:
         self.collection_id=collection_id
         self._collection=None
         self._client=None
+        self._catalogurl="https://hydroweb.next.theia-land.fr/api/v1/rs-catalog/stac"
         self.headers={"X-API-Key":apikey,"Accept": "application/json","Content-Type": "application/json","User-Agent":"Mozilla/5.0 (X11; Linux x86_64; rv:133.0) Gecko/20100101 Firefox/133.0"}
         
         #assign the appropriate assets data reader
@@ -188,7 +189,7 @@ class HydrowebConnect:
     @property
     def client(self):
         if self._client is None:
-            self._client=Client.open("https://hydroweb.next.theia-land.fr/api/v1/rs-catalog/stac",headers=self.headers)
+            self._client=Client.open(self._catalogurl,headers=self.headers)
             self.apicalls+=1
         
         return self._client
@@ -234,8 +235,16 @@ class HydrowebConnect:
         #get the first asset (only) and download the data from the url
         try:
             firstasset=next(iter(self.collection.get_item(item_id).assets.values()))
+            asseturl=firstasset.href
+
             self.apicalls+=1
-            req=requests.get(firstasset.href,headers=self.headers) 
+
+            s = requests.Session()
+            retries = requests.adapters.Retry(total=2, backoff_factor=0.1, status_forcelist=[502, 503, 504], allowed_methods={'POST','GET'})
+            s.mount(asseturl, requests.adapters.HTTPAdapter(max_retries=retries)) 
+            
+            req=s.get(asseturl,headers=self.headers)
+            
             self.apicalls+=1
             df=self.readasset(io.StringIO(req.text))
         except:
