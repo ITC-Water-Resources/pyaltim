@@ -16,6 +16,8 @@ from sqlalchemy.ext.declarative import declared_attr, as_declarative
 from sqlalchemy import MetaData
 from geoslurp.types.json import DataArrayJSONType
 from pyaltim.portals.api import APILimitReached,APIDataNotFound
+from geoslurp.view.viewBase import TView 
+
 
 schema="pyaltim"
 
@@ -111,7 +113,9 @@ class HydrosatBase(DataSet):
             self.upsertEntry(proddict,index_elements=['hyd_no'])
             ncount+=1
 
-
+class hydrosat_wl_targets(TView):
+    schema=schema
+    qry=f"SELECT * FROM {HydrosatTargets.stname()} WHERE data_type='WL'"
 
 
 def getHydroSatDsets(conf):
@@ -125,3 +129,7 @@ def getHydroSatDsets(conf):
         clss.append(type(clsName, (HydrosatBase,), {"product":product,"table":qtable}))
 
     return clss
+
+
+def getHydroSatviews():
+    return [hydrosat_wl_targets]

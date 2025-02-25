@@ -37,3 +37,5 @@ hydrosat = "pyaltim.geoslurp.hydrosat:getHydroSatDsets"
 sworddb = "pyaltim.geoslurp.sword:getSwordDsets"
 
 
+[project.entry-points."geoslurp.viewfactories"]
+hysatview = "pyaltim.geoslurp.hydrosat:getHydroSatviews"
