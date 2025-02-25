@@ -33,6 +33,7 @@ dependencies = [ "xarray >= 2023.1.0","importlib_metadata","requests","pystac-cl
 [project.entry-points."geoslurp.dsetfactories"]
 hydroweb = "pyaltim.geoslurp.hydroweb:getHydroWebDsets"
 dahitiweb = "pyaltim.geoslurp.dahiti:getDahitiDsets"
+hydrosat = "pyaltim.geoslurp.hydrosat:getHydroSatDsets"
 sworddb = "pyaltim.geoslurp.sword:getSwordDsets"
 
 
