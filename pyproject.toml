@@ -35,7 +35,10 @@ hydroweb = "pyaltim.geoslurp.hydroweb:getHydroWebDsets"
 dahitiweb = "pyaltim.geoslurp.dahiti:getDahitiDsets"
 hydrosat = "pyaltim.geoslurp.hydrosat:getHydroSatDsets"
 sworddb = "pyaltim.geoslurp.sword:getSwordDsets"
+radsdb = "pyaltim.geoslurp.rads:getRadsDsets"
 
+#[project.entry-points."geoslurp.dbfuncs"]
+#radssubsegment = "pyaltim.geoslurp.rads:gs_rads_subsegment"
 
 [project.entry-points."geoslurp.viewfactories"]
 hysatview = "pyaltim.geoslurp.hydrosat:getHydroSatviews"
