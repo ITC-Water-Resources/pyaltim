@@ -24,15 +24,17 @@ from zipfile import ZipFile
 from pyaltim.core.logging import altlogger
 
 schema="pyaltim"
+sword_version=16
 
 class SwordBase(OGRBase):
     """
     Base class for SWORD: the SWOT River Database, Version 15. If you would like more information about SWORD, please see the paper published in Water Resources Research in 2021, led by Elizabeth Altenau. You can access it here: https://agupubs.onlinelibrary.wiley.com/doi/10.1029/2021WR030054
     """
-    url='http://gaia.geosci.unc.edu/SWORD/SWORD_v15_gpkg.zip'
-    path="SWORD_v15_gpkg.zip"
+    # url='http://gaia.geosci.unc.edu/SWORD/SWORD_v15_gpkg.zip'
+    url=f'https://zenodo.org/records/10013982/files/SWORD_v{sword_version}_gpkg.zip'
+    path=f"SWORD_v{sword_version}_gpkg.zip"
     schema=schema
-    version=(0,0,0)
+    version=(sword_version,0,0)
     cont=None
     swordtype=None
     
@@ -45,7 +47,7 @@ class SwordBase(OGRBase):
         
     def pull(self):
         """Pulls the geojson data from the url and unpacks it in the cache directory"""
-        uri=http(self.url,lastmod=datetime(2023,6,28))
+        uri=http(self.url,lastmod=datetime(2023,8,1))
         altlogger.info("Downloading SWORD data")
         uri.download(direc=self.cacheDir(),outfile=self.path,check=True)
         if not os.path.exists(self.ogrfile):
@@ -59,7 +61,7 @@ class SwordBase(OGRBase):
             altlogger.info("Already extracted geopackage member")
         
     def getogrfile(self):
-        return os.path.join(self.cacheDir("gpkg"),self.cont+"_sword_"+self.swordtype+"_v15.gpkg")
+        return os.path.join(self.cacheDir("gpkg"),self.cont+"_sword_"+self.swordtype+f"_v{sword_version}.gpkg")
 
 def SwordClassFactory(clsName,val):
     return type(clsName, (SwordBase,), {"cont":val["cont"], "swordtype":val["swordtype"]})
@@ -69,12 +71,12 @@ def getSwordDsets(conf):
     continents=["eu","af","sa","oc","as","na"]
     swordtypes = ["reaches", "nodes"]
     out=[]
-    
+    version=f"v{sword_version}"
     #create a list of datasets
     for continent in continents:
         for swordtype in swordtypes:
             entry={"cont":continent,"swordtype":swordtype}
-            clsname=continent + "_sword_" + swordtype
+            clsname=continent + "_sword_" + swordtype + version
             out.append(SwordClassFactory(clsname,entry))
 
 
