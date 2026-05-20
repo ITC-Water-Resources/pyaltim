@@ -61,8 +61,9 @@ class DahitiConnect:
         if len(waterlevel['data']) == 0:
             raise APIDataNotFound(f"No data found for {dah_id}")
         
-        ds=xr.Dataset(dict(water_level=('time',[val['water_level'] for val in waterlevel['data']]),wl_err=('time',[val['error'] for val in waterlevel['data']])),coords=dict(time=('time',[val['datetime'] for val in waterlevel['data']])))
-        return waterlevel['info'],ds
+        ds=xr.Dataset(dict(water_level=('time',[val['wse'] for val in waterlevel['data']]),wl_err=('time',[val['wse_u'] for val in waterlevel['data']])),coords=dict(time=('time',[val['datetime'] for val in waterlevel['data']])))
+        info={ky: waterlevel[ky] for ky in waterlevel if ky != "data"}
+        return info,ds
         # df=pd.DataFrame(dict(time=[np.datetime64(val['datetime']) for val in waterlevel['data']],water_level=[val['water_level'] for val in waterlevel['data']],wl_err=[val['error'] for val in waterlevel['data']]))
         # return waterlevel['info'],df
 
